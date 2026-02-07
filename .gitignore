@@ -130,3 +130,4 @@ iOSInjectionProject/
 # End of https://www.toptal.com/developers/gitignore/api/dotnetcore,swift,macos
 
 .claude
+BenchmarkDotNet.Artifacts

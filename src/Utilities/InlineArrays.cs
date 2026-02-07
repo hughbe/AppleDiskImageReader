@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace AppleIIDiskReader.Utilities;
+namespace AppleDiskImageReader.Utilities;
 
 /// <summary>
 /// An inline array of 16 bytes.

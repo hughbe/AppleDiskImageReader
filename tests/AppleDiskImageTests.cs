@@ -2,7 +2,7 @@
 
 namespace AppleDiskImageReader.Tests;
 
-public class AppleIIDiskTests
+public class AppleDiskImageTests
 {
     public static TheoryData<string> DiskImages =>
     [

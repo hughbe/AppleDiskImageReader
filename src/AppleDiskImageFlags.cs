@@ -39,12 +39,7 @@ public readonly struct AppleDiskImageFlags
             throw new ArgumentException($"Data must be exactly {Size} bytes.", nameof(data));
         }
 
-        int offset = 0;
-
-        RawValue = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
-        offset += 4;
-
-        Debug.Assert(offset == data.Length, "Did not consume all data for AppleDiskImageFlags");
+        RawValue = BinaryPrimitives.ReadUInt32LittleEndian(data);
     }
 
     /// <inheritdoc/>

@@ -34,7 +34,11 @@ public class AppleDiskImage
 
         // Read the prefix
         Span<byte> prefixData = stackalloc byte[AppleDiskImagePrefix.Size];
-        if (stream.Read(prefixData) != prefixData.Length)
+        try
+        {
+            stream.ReadExactly(prefixData);
+        }
+        catch (EndOfStreamException)
         {
             throw new ArgumentException("Stream is too short to contain a valid Apple Disk Image prefix.", nameof(stream));
         }
@@ -48,7 +52,8 @@ public class AppleDiskImage
     /// <returns>>The data as a byte array.</returns>
     public byte[] GetImageData()
     {
-        using var outputStream = new MemoryStream();
+        int capacity = (int)GetActualDataLength();
+        using var outputStream = new MemoryStream(capacity);
         GetImageData(outputStream);
         return outputStream.ToArray();
     }
@@ -67,7 +72,7 @@ public class AppleDiskImage
     /// <returns>>The comment data as a byte array.</returns>
     public byte[] GetCommentData()
     {
-        using var outputStream = new MemoryStream();
+        using var outputStream = new MemoryStream((int)Prefix.CommentLength);
         GetCommentData(outputStream);
         return outputStream.ToArray();
     }
@@ -86,7 +91,7 @@ public class AppleDiskImage
     /// <returns>The creator data as a byte array.</returns>
     public byte[] GetCreatorData()
     {
-        using var outputStream = new MemoryStream();
+        using var outputStream = new MemoryStream((int)Prefix.CreatorDataLength);
         GetCreatorData(outputStream);
         return outputStream.ToArray();
     }
@@ -150,14 +155,15 @@ public class AppleDiskImage
             while (remaining > 0)
             {
                 int toRead = Math.Min(remaining, bufferSize);
-                int bytesRead = _stream.Read(rentedBuffer, 0, toRead);
+                Span<byte> buffer = rentedBuffer.AsSpan(0, toRead);
+                int bytesRead = _stream.Read(buffer);
 
                 if (bytesRead == 0)
                 {
                     break; // End of source stream
                 }
 
-                outputStream.Write(rentedBuffer, 0, bytesRead);
+                outputStream.Write(rentedBuffer.AsSpan(0, bytesRead));
                 totalBytesRead += bytesRead;
                 remaining -= bytesRead;
             }

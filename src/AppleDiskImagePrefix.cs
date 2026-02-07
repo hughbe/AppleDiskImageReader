@@ -1,7 +1,6 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Text;
-using AppleIIDiskReader.Utilities;
+using AppleDiskImageReader.Utilities;
 
 namespace AppleDiskImageReader;
 
@@ -18,12 +17,12 @@ public readonly struct AppleDiskImagePrefix
     /// <summary>
     /// Gets the signature of the Apple Disk Image.
     /// </summary>
-    public string Signature { get; }
+    public String4 Signature { get; }
 
     /// <summary>
     /// Gets the creator signature of the Apple Disk Image.
     /// </summary>
-    public string CreatorSignature { get; }
+    public String4 CreatorSignature { get; }
 
     /// <summary>
     /// Gets the header length of the Apple Disk Image.
@@ -101,20 +100,20 @@ public readonly struct AppleDiskImagePrefix
         int offset = 0;
 
         // magic file signature, a 4-char string "2IMG" ($32 $49 $4d $47)
-        Signature = Encoding.ASCII.GetString(data.Slice(offset, 4));
-        offset += 4;
+        Signature = new String4(data.Slice(offset, String4.Size));
+        offset += String4.Size;
 
-        if (Signature != "2IMG")
+        if (!Signature.Equals("2IMG"u8))
         {
             throw new ArgumentException("Invalid Apple Disk Image signature.", nameof(data));
         }
 
         // creator signature code, a 4-char string
-        CreatorSignature = Encoding.ASCII.GetString(data.Slice(offset, 4));
-        offset += 4;
+        CreatorSignature = new String4(data.Slice(offset, String4.Size));
+        offset += String4.Size;
 
         // header length, in bytes; should be 64
-        HeaderLength = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset, 2));
+        HeaderLength = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset));
         offset += 2;
 
         if (HeaderLength != Size)
@@ -123,7 +122,7 @@ public readonly struct AppleDiskImagePrefix
         }
 
         // file format version (always 1)
-        Version = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset, 2));
+        Version = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset));
         offset += 2;
 
         if (Version != 1)
@@ -132,10 +131,10 @@ public readonly struct AppleDiskImagePrefix
         }
 
         // image data format (0=DOS order, 1=ProDOS order, 2=nibbles)
-        Format = (AppleDiskImageFormat)BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        Format = (AppleDiskImageFormat)BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
-        if (!Enum.IsDefined(Format))
+        if (Format > AppleDiskImageFormat.Nibble)
         {
             throw new ArgumentException("Unknown Apple Disk Image format.", nameof(data));
         }
@@ -145,11 +144,11 @@ public readonly struct AppleDiskImagePrefix
         offset += AppleDiskImageFlags.Size;
 
         // number of 512-byte blocks; only meaningful when format==1
-        NumberOfBlocks = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        NumberOfBlocks = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         // offset from start of file to data (should be 64, same as header length)
-        DataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        DataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         if (DataOffset != Size)
@@ -158,11 +157,11 @@ public readonly struct AppleDiskImagePrefix
         }
 
         // length of data, in bytes
-        DataLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        DataLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         // offset from start of file to comment
-        CommentOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        CommentOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         if (CommentOffset != 0 && CommentOffset < Size)
@@ -171,11 +170,11 @@ public readonly struct AppleDiskImagePrefix
         }
 
         // length of comment, in bytes
-        CommentLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        CommentLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         // offset from start of file to creator data
-        CreatorDataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        CreatorDataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         if (CreatorDataOffset != 0 && CreatorDataOffset < Size)
@@ -184,7 +183,7 @@ public readonly struct AppleDiskImagePrefix
         }
 
         // length of creator data, in bytes
-        CreatorDataLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        CreatorDataLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
         // reserved, must be zero (pads header to 64 bytes)
