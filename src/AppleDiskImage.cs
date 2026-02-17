@@ -155,17 +155,11 @@ public class AppleDiskImage
             while (remaining > 0)
             {
                 int toRead = Math.Min(remaining, bufferSize);
-                Span<byte> buffer = rentedBuffer.AsSpan(0, toRead);
-                int bytesRead = _stream.Read(buffer);
+                _stream.ReadExactly(rentedBuffer.AsSpan(0, toRead));
 
-                if (bytesRead == 0)
-                {
-                    break; // End of source stream
-                }
-
-                outputStream.Write(rentedBuffer.AsSpan(0, bytesRead));
-                totalBytesRead += bytesRead;
-                remaining -= bytesRead;
+                outputStream.Write(rentedBuffer.AsSpan(0, toRead));
+                totalBytesRead += toRead;
+                remaining -= toRead;
             }
 
             return totalBytesRead;
