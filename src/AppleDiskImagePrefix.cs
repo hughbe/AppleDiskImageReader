@@ -88,7 +88,7 @@ public readonly struct AppleDiskImagePrefix
     /// Initializes a new instance of the <see cref="AppleDiskImagePrefix"/> struct.
     /// </summary>
     /// <param name="data">The prefix data.</param>
-    /// <exception cref="ArgumentException">>Thrown when the data length is not equal to <see cref="Size"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown when the data is not a valid 2IMG prefix.</exception>
     public AppleDiskImagePrefix(ReadOnlySpan<byte> data)
     {
         if (data.Length != Size)
@@ -116,7 +116,9 @@ public readonly struct AppleDiskImagePrefix
         HeaderLength = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset));
         offset += 2;
 
-        if (HeaderLength != Size)
+        // Some early image creators wrote 52 here, even though the on-disk
+        // prefix is padded to 64 bytes. Both values are found in the wild.
+        if (HeaderLength is not (52 or Size))
         {
             throw new ArgumentException("Invalid Apple Disk Image header length.", nameof(data));
         }
@@ -151,7 +153,7 @@ public readonly struct AppleDiskImagePrefix
         DataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
-        if (DataOffset != Size)
+        if (DataOffset < Size)
         {
             throw new ArgumentException("Invalid Apple Disk Image data offset.", nameof(data));
         }
@@ -173,6 +175,11 @@ public readonly struct AppleDiskImagePrefix
         CommentLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
+        if ((CommentOffset == 0) != (CommentLength == 0))
+        {
+            throw new ArgumentException("The Apple Disk Image comment offset and length must both be zero or both be non-zero.", nameof(data));
+        }
+
         // offset from start of file to creator data
         CreatorDataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
@@ -186,9 +193,19 @@ public readonly struct AppleDiskImagePrefix
         CreatorDataLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset));
         offset += 4;
 
+        if ((CreatorDataOffset == 0) != (CreatorDataLength == 0))
+        {
+            throw new ArgumentException("The Apple Disk Image creator data offset and length must both be zero or both be non-zero.", nameof(data));
+        }
+
         // reserved, must be zero (pads header to 64 bytes)
         Reserved = new ByteArray16(data.Slice(offset, ByteArray16.Size));
         offset += ByteArray16.Size;
+
+        if (!Reserved.IsZero)
+        {
+            throw new ArgumentException("The reserved Apple Disk Image header bytes must be zero.", nameof(data));
+        }
 
         Debug.Assert(offset == data.Length, "Did not consume all data for AppleDiskImagePrefix");
     }

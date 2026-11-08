@@ -33,11 +33,11 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
         var input = new FileInfo(settings.Input);
         if (!input.Exists)
         {
-            AnsiConsole.MarkupLine($"[red]Input file not found[/]: {input.FullName}");
+            AnsiConsole.MarkupLine($"[red]Input file not found[/]: {Markup.Escape(input.FullName)}");
             return -1;
         }
 
-        AnsiConsole.MarkupLine($"[cyan]Reading 2IMG file[/]: {input.Name}");
+        AnsiConsole.MarkupLine($"[cyan]Reading 2IMG file[/]: {Markup.Escape(input.Name)}");
         AnsiConsole.WriteLine();
 
         await using var stream = input.OpenRead();
@@ -49,7 +49,7 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error reading 2IMG file[/]: {ex.Message}");
+            AnsiConsole.MarkupLine($"[red]Error reading 2IMG file[/]: {Markup.Escape(ex.Message)}");
             return -1;
         }
 
@@ -59,8 +59,8 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
         table.AddColumn("Property");
         table.AddColumn("Value");
 
-        table.AddRow("Signature", image.Prefix.Signature);
-        table.AddRow("Creator", image.Prefix.CreatorSignature);
+        table.AddRow("Signature", Markup.Escape(image.Prefix.Signature));
+        table.AddRow("Creator", Markup.Escape(image.Prefix.CreatorSignature));
         table.AddRow("Version", image.Prefix.Version.ToString());
         table.AddRow("Format", FormatDiskFormat(image.Prefix.Format));
         table.AddRow("Flags", $"0x{image.Prefix.Flags.RawValue:X8}");
@@ -70,11 +70,7 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
             table.AddRow("Number of Blocks", image.Prefix.NumberOfBlocks.ToString());
         }
 
-        var actualDataLength = image.Prefix.DataLength == 0 && image.Prefix.Format == AppleDiskImageFormat.ProDOS
-            ? image.Prefix.NumberOfBlocks * 512
-            : image.Prefix.DataLength;
-
-        table.AddRow("Data Length", $"{actualDataLength:N0} bytes");
+        table.AddRow("Data Length", $"{image.ImageDataLength:N0} bytes");
         table.AddRow("Comment Length", $"{image.Prefix.CommentLength:N0} bytes");
         table.AddRow("Creator Data Length", $"{image.Prefix.CreatorDataLength:N0} bytes");
 
@@ -93,11 +89,11 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
 
         // Extract disk image data
         await AnsiConsole.Status()
-            .StartAsync("Extracting disk image data...", async ctx =>
+            .StartAsync("Extracting disk image data...", async _ =>
             {
                 var diskImagePath = Path.Combine(outputDir.FullName, GetDiskImageFileName(input.Name, image.Prefix.Format));
                 await using var outputStream = File.Create(diskImagePath);
-                image.GetImageData(outputStream);
+                await image.CopyImageDataToAsync(outputStream, cancellationToken);
                 extractedFiles.Add(diskImagePath);
             });
 
@@ -105,11 +101,11 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
         if (image.Prefix.CommentLength > 0)
         {
             await AnsiConsole.Status()
-                .StartAsync("Extracting comment...", async ctx =>
+                .StartAsync("Extracting comment...", async _ =>
                 {
                     var commentPath = Path.Combine(outputDir.FullName, "comment.txt");
                     await using var outputStream = File.Create(commentPath);
-                    image.GetCommentData(outputStream);
+                    await image.CopyCommentDataToAsync(outputStream, cancellationToken);
                     extractedFiles.Add(commentPath);
                 });
         }
@@ -118,25 +114,25 @@ sealed class ExtractCommand : AsyncCommand<ExtractSettings>
         if (image.Prefix.CreatorDataLength > 0)
         {
             await AnsiConsole.Status()
-                .StartAsync("Extracting creator data...", async ctx =>
+                .StartAsync("Extracting creator data...", async _ =>
                 {
                     var creatorDataPath = Path.Combine(outputDir.FullName, "creator-data.bin");
                     await using var outputStream = File.Create(creatorDataPath);
-                    image.GetCreatorData(outputStream);
+                    await image.CopyCreatorDataToAsync(outputStream, cancellationToken);
                     extractedFiles.Add(creatorDataPath);
                 });
         }
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"[green]Extraction complete[/]");
-        AnsiConsole.MarkupLine($"Output directory: [yellow]{outputDir.FullName}[/]");
+        AnsiConsole.MarkupLine($"Output directory: [yellow]{Markup.Escape(outputDir.FullName)}[/]");
         AnsiConsole.WriteLine();
 
         AnsiConsole.MarkupLine("[cyan]Extracted files:[/]");
         foreach (var file in extractedFiles)
         {
             var fileInfo = new FileInfo(file);
-            AnsiConsole.MarkupLine($"  - [yellow]{Path.GetFileName(file)}[/] ({fileInfo.Length:N0} bytes)");
+            AnsiConsole.MarkupLine($"  - [yellow]{Markup.Escape(Path.GetFileName(file))}[/] ({fileInfo.Length:N0} bytes)");
         }
 
         return 0;

@@ -31,7 +31,18 @@ public struct ByteArray16
 
     /// <summary>
     /// Gets a span over the elements of the array.
-    /// </summary>   
+    /// </summary>
     public Span<byte> AsSpan() =>
-        MemoryMarshal.CreateSpan(ref _element0, 16);
+        MemoryMarshal.CreateSpan(ref _element0, Size);
+
+    /// <summary>
+    /// Gets a read-only span over the elements of the array.
+    /// </summary>
+    public readonly ReadOnlySpan<byte> AsReadOnlySpan() =>
+        MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in _element0), Size);
+
+    /// <summary>
+    /// Gets a value indicating whether every byte is zero.
+    /// </summary>
+    public readonly bool IsZero => AsReadOnlySpan().IndexOfAnyExcept((byte)0) < 0;
 }
