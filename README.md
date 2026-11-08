@@ -48,6 +48,7 @@ Console.WriteLine($"Creator: {image.Prefix.CreatorSignature}");
 Console.WriteLine($"Format: {image.Prefix.Format}");
 Console.WriteLine($"Version: {image.Prefix.Version}");
 Console.WriteLine($"Data Length: {image.Prefix.DataLength} bytes");
+Console.WriteLine($"Effective Data Length: {image.ImageDataLength} bytes");
 Console.WriteLine($"Number of Blocks: {image.Prefix.NumberOfBlocks}");
 ```
 
@@ -60,7 +61,7 @@ File.WriteAllBytes("disk.dsk", diskData);
 
 // Or write directly to a stream
 using var outputStream = File.Create("disk.dsk");
-image.GetImageData(outputStream);
+await image.CopyImageDataToAsync(outputStream);
 ```
 
 ### Reading Comments and Creator Data
@@ -90,12 +91,25 @@ The main class for reading 2IMG disk image containers.
 
 - `AppleDiskImage(Stream stream)` - Opens a 2IMG disk image from a stream
 - `Prefix` - Gets the 2IMG prefix containing metadata
+- `ImageDataLength` - Gets the effective image length, including the ProDOS block-count fallback used by some WOOF images
 - `GetImageData()` - Extracts disk image data as a byte array
 - `GetImageData(Stream)` - Extracts disk image data to a stream
+- `CopyImageDataTo(Stream)` - Copies image data to a stream with a 64-bit byte count
+- `CopyImageDataToAsync(Stream, CancellationToken)` - Asynchronously copies image data
 - `GetCommentData()` - Reads comment data as a byte array
 - `GetCommentData(Stream)` - Reads comment data to a stream
+- `CopyCommentDataTo(Stream)` / `CopyCommentDataToAsync(...)` - Copies comment data with synchronous or asynchronous I/O
 - `GetCreatorData()` - Reads creator-specific data as a byte array
 - `GetCreatorData(Stream)` - Reads creator-specific data to a stream
+- `CopyCreatorDataTo(Stream)` / `CopyCreatorDataToAsync(...)` - Copies creator data with synchronous or asynchronous I/O
+
+`AppleDiskImage` does not own the stream: keep it open while the image is in use and dispose it yourself. Calls are serialized internally, so they are safe to make concurrently, and the stream position is restored after each call.
+
+#### Validation
+
+The constructor throws `ArgumentException` (with `ParamName` `"stream"` or `"data"`) when the input is not a valid 2IMG file. It rejects, among other things: a wrong signature, header length (other than 64 or 52), or version; an unknown format; a data offset inside the header; a comment or creator-data offset/length pair where only one is zero; non-zero reserved bytes; sections that extend past the end of the stream; and a comment or creator chunk that overlaps the data before it (chunks must appear in the order data, comment, creator data).
+
+The original `Get*Data(Stream)` overloads return 32-bit byte counts and are retained for compatibility. Use the `Copy*DataTo` methods for large sections or asynchronous I/O.
 
 ### AppleDiskImagePrefix
 
@@ -103,12 +117,12 @@ Contains the 2IMG header metadata (64 bytes):
 
 - `Signature` - File signature ("2IMG")
 - `CreatorSignature` - Creator application signature (4 characters)
-- `HeaderLength` - Header length in bytes (64)
+- `HeaderLength` - Header length in bytes (64; some early creators wrote 52, which is also accepted)
 - `Version` - File format version (1)
 - `Format` - Image format (DOS, ProDOS, or Nibble)
 - `Flags` - Format-specific flags
 - `NumberOfBlocks` - Number of 512-byte blocks (ProDOS format only)
-- `DataOffset` - Offset to disk image data (64)
+- `DataOffset` - Offset to disk image data (normally 64; any value of at least 64 is accepted)
 - `DataLength` - Length of disk image data in bytes
 - `CommentOffset` - Offset to optional comment data
 - `CommentLength` - Length of comment data in bytes
@@ -128,6 +142,9 @@ Enum of supported disk image formats:
 Flags field containing format-specific metadata:
 
 - `RawValue` - Raw 32-bit flags value
+- `HasVolumeNumber` - Whether a DOS volume number is explicitly present
+- `VolumeNumber` - Explicit volume number, or the format default of 254
+- `IsWriteProtected` - Whether the image is marked write-protected
 
 ## Building
 
@@ -155,8 +172,10 @@ dotnet build dumper/AppleDiskImageDumper.csproj -c Release
 
 ### Usage
 
+The dumper is not packaged as a global tool; run it from the repository with `dotnet run` (the examples below use the short name `apple-disk-image-dumper` for the built executable):
+
 ```sh
-apple-disk-image-dumper <input> [-o|--output <path>]
+dotnet run --project dumper -- <input> [-o|--output <path>]
 ```
 
 #### Arguments
@@ -215,7 +234,7 @@ apple-disk-image-dumper disk.2mg -o extracted
 
 MIT License. See [LICENSE](LICENSE) for details.
 
-Copyright (c) 2025 Hugh Bellamy
+Copyright (c) 2026 Hugh Bellamy
 
 ## About the 2IMG Format
 

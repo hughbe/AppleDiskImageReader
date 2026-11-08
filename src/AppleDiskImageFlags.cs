@@ -8,6 +8,10 @@ namespace AppleDiskImageReader;
 /// </summary>
 public readonly struct AppleDiskImageFlags
 {
+    private const uint VolumeNumberMask = 0x000000ff;
+    private const uint VolumeNumberPresentMask = 0x00000100;
+    private const uint WriteProtectedMask = 0x80000000;
+
     /// <summary>
     /// The size of the Apple Disk Image flags in bytes.
     /// </summary>
@@ -17,6 +21,22 @@ public readonly struct AppleDiskImageFlags
     /// Gets the raw flags value.
     /// </summary>
     public uint RawValue { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether a volume number is explicitly present.
+    /// </summary>
+    public bool HasVolumeNumber => (RawValue & VolumeNumberPresentMask) != 0;
+
+    /// <summary>
+    /// Gets the DOS 3.3 volume number, or the format-defined default of 254 when
+    /// no volume number is explicitly present.
+    /// </summary>
+    public byte VolumeNumber => HasVolumeNumber ? (byte)(RawValue & VolumeNumberMask) : (byte)254;
+
+    /// <summary>
+    /// Gets a value indicating whether the disk image is write-protected.
+    /// </summary>
+    public bool IsWriteProtected => (RawValue & WriteProtectedMask) != 0;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AppleDiskImageFlags"/> struct.

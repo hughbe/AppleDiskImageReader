@@ -15,8 +15,4 @@
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="../tests/Samples/*.dsk" Link="Samples/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
 </Project>

@@ -6,6 +6,8 @@ namespace AppleDiskImageReader.Utilities;
 
 /// <summary>
 /// Represents a fixed-size string of up to 4 bytes (e.g., file type, creator codes).
+/// Bytes are interpreted as Latin-1 (each byte maps to the char of the same value), and the
+/// string ends at the first null byte; any bytes after it are ignored by comparisons.
 /// </summary>
 [InlineArray(Size)]
 public struct String4 : ISpanFormattable, IEquatable<String4>
@@ -102,7 +104,8 @@ public struct String4 : ISpanFormattable, IEquatable<String4>
         ReadOnlySpan<byte> span = AsReadOnlySpan();
         int length = Length;
 
-        return Encoding.ASCII.GetString(span[..length]);
+        // Latin-1 maps every byte to the char with the same value, matching TryFormat and Equals(ReadOnlySpan<char>).
+        return Encoding.Latin1.GetString(span[..length]);
     }
 
     /// <summary>
@@ -146,10 +149,19 @@ public struct String4 : ISpanFormattable, IEquatable<String4>
         return AsReadOnlySpan()[..length].SequenceEqual(other);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Determines whether this string equals another. Like every other comparison and
+    /// <see cref="ToString"/>, only the bytes before the first null terminator are significant.
+    /// </summary>
+    /// <param name="other">The string to compare with.</param>
+    /// <returns>true if the strings are equal; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly bool Equals(String4 other) =>
-        AsReadOnlySpan().SequenceEqual(other.AsReadOnlySpan());
+    public readonly bool Equals(String4 other)
+    {
+        int length = Length;
+        return length == other.Length
+            && AsReadOnlySpan()[..length].SequenceEqual(other.AsReadOnlySpan()[..length]);
+    }
 
     /// <inheritdoc/>
     public override readonly bool Equals(object? obj) =>
@@ -159,8 +171,10 @@ public struct String4 : ISpanFormattable, IEquatable<String4>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
-        ReadOnlySpan<byte> span = AsReadOnlySpan();
-        return HashCode.Combine(span[0], span[1], span[2], span[3]);
+        // Must be consistent with Equals(String4): only bytes before the first null count.
+        HashCode hash = default;
+        hash.AddBytes(AsReadOnlySpan()[..Length]);
+        return hash.ToHashCode();
     }
 
     /// <summary>
